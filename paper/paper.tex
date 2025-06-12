@@ -43,15 +43,15 @@
 \end{titlepage}
 
 \begin{abstract}
-The success of DeepMind's AlphaGo~\cite{alphago} and its successors, AlphaZero~\cite{alphazero} and MuZero~\cite{muzero}, marked a pivotal moment in Artificial Intelligence, particularly in reinforcement learning (RL) and game playing. This essay critically examines these three landmark systems. We will delve into their core methodologies, tracing the evolution from AlphaGo's reliance on human expert data and distinct network components to AlphaZero's unified, tabula rasa learning, and finally to MuZero's ability to master games without prior knowledge of their rules by learning its own model of the environment. The mathematical underpinnings of their learning algorithms and search techniques will be explored. Furthermore, these systems will be contextualized within broader RL paradigms, and their strengths, limitations, and profound impact on the field will be evaluated.
+The success of DeepMind's AlphaGo~\cite{alphago} and its successors, AlphaZero~\cite{alphazero} and MuZero~\cite{muzero}, marked a pivotal moment in Artificial Intelligence, particularly in Reinforcement Learning (RL). This essay critically examines these three landmark systems. We will delve into their core methodologies, tracing the evolution from AlphaGo's reliance on human expert data and distinct network components to AlphaZero's unified, tabula rasa learning, and finally to MuZero's ability to master games without prior knowledge of their rules by learning its own model of the environment. The mathematical principles of their learning algorithms and search techniques will be explored. Furthermore, these systems will be contextualized within broader RL paradigms, and their strengths, limitations, and profound impact on the field will be evaluated.
 \end{abstract}
 
 \section{Introduction}
 The game of Go, with its vast search space and complex positional evaluation, long stood as a grand challenge for Artificial Intelligence. Traditional AI approaches, successful in games like chess, struggled to reach professional human levels in Go. The advent of the AlphaGo family of algorithms, developed by DeepMind, represented a paradigm shift, not only conquering Go but also providing a general framework for tackling complex decision-making problems. This essay aims to:
 \begin{enumerate}
     \item Explain the core technical contributions of AlphaGo~\cite{alphago}, AlphaZero~\cite{alphazero}, and MuZero~\cite{muzero}.
-    \item Discuss the mathematical formulations underpinning their learning and search processes.
-    \item Contextualize these methods within the broader landscape of reinforcement learning.
+    \item Discuss the mathematical principles of their learning and search processes.
+    \item Contextualize these methods within the broader landscape of Reinforcement Learning.
     \item Offer a critical evaluation of their strengths, weaknesses, and overall impact.
 \end{enumerate}
 
@@ -200,7 +200,7 @@ The AlphaGo family integrates and advances several key RL concepts:
 \end{itemize}
 
 \section{Conclusion}
-The AlphaGo family represents a monumental achievement in AI and reinforcement learning. The journey from AlphaGo's expert-data-primed system to AlphaZero's tabula rasa mastery of several board games, and culminating in MuZero's ability to learn game dynamics from scratch, showcases a relentless pursuit of generality and autonomy. These systems have not only solved long-standing AI challenges but have also provided powerful new frameworks that blend deep learning with sophisticated search techniques.
+The AlphaGo family represents a monumental achievement in AI and Reinforcement Learning. The journey from AlphaGo's expert-data-primed system to AlphaZero's tabula rasa mastery of several board games, and culminating in MuZero's ability to learn game dynamics from scratch, showcases a relentless pursuit of generality and autonomy. These systems have not only solved long-standing AI challenges but have also provided powerful new frameworks that blend deep learning with sophisticated search techniques.
 
 Key mathematical contributions include the effective use of MCTS guided by learned policy and value functions, the end-to-end training of these components through self-play, and in MuZero, the pioneering approach of learning a model of the environment tailored for planning.
 
