@@ -6,11 +6,11 @@
 \usepackage[english]{babel}
 \usepackage{csquotes}
 \usepackage[style=numeric, sorting=none]{biblatex}
-\usepackage{amsmath}
 \usepackage{graphicx}
 \usepackage[colorlinks=true, allcolors=blue]{hyperref}
 \usepackage{parskip}
 \usepackage{multirow}
+\usepackage{amsmath, amssymb, amsthm}
 \hypersetup{
     colorlinks,
     linkcolor=black,  
@@ -23,7 +23,7 @@
 
 \setlength{\parskip}{1em}
 
-\bibliography{references}
+\bibliography{bibliography}
 \author{Bruno Sánchez Gómez}
 \date{\today}
 
@@ -43,168 +43,238 @@
 \end{titlepage}
 
 \begin{abstract}
-The success of DeepMind's AlphaGo~\cite{alphago} and its successors, AlphaZero~\cite{alphazero} and MuZero~\cite{muzero}, marked a pivotal moment in Artificial Intelligence, particularly in Reinforcement Learning (RL). This essay critically examines these three landmark systems. We will delve into their core methodologies, tracing the evolution from AlphaGo's reliance on human expert data and distinct network components to AlphaZero's unified, tabula rasa learning, and finally to MuZero's ability to master games without prior knowledge of their rules by learning its own model of the environment. The mathematical principles of their learning algorithms and search techniques will be explored. Furthermore, these systems will be contextualized within broader RL paradigms, and their strengths, limitations, and profound impact on the field will be evaluated.
+The AlphaGo family of algorithms developed by DeepMind represents a series of landmark achievements in Artificial Intelligence (AI) and Reinforcement Learning (RL). This essay critically examines the evolution of these algorithms (AlphaGo, AlphaZero, and MuZero) by analyzing their core methodologies, mathematical foundations, and contributions to the field of RL. We trace their progression from leveraging human expertise to achieving superhuman performance via pure self-play, and ultimately to learning environment dynamics tabula rasa. This analysis highlights the key innovations, trade-offs, and enduring challenges in the quest for general-purpose learning agents capable of mastering complex sequential decision-making problems.
 \end{abstract}
 
 \section{Introduction}
-The game of Go, with its vast search space and complex positional evaluation, long stood as a grand challenge for Artificial Intelligence. Traditional AI approaches, successful in games like chess, struggled to reach professional human levels in Go. The advent of the AlphaGo family of algorithms, developed by DeepMind, represented a paradigm shift, not only conquering Go but also providing a general framework for tackling complex decision-making problems. This essay aims to:
+The challenge of creating Artificial Intelligence capable of excelling in complex strategic games has long been a benchmark for progress in the field. Games like Go, with their vast search spaces and need for nuanced, long-term planning, were considered grand challenges for AI. The development of the AlphaGo family of algorithms by DeepMind marked a paradigm shift, demonstrating the power of deep Reinforcement Learning combined with sophisticated search techniques. This essay aims to critically analyze the evolution of three pivotal systems in this lineage: AlphaGo \cite{alphago}, AlphaZero \cite{alphazero}, and MuZero \cite{muzero}. We will delve into their respective approaches, discuss their mathematical principles, and evaluate their contributions, strengths, and limitations in the broader context of Reinforcement Learning. This journey from AlphaGo, which learned from human data, to AlphaZero, which mastered games purely through self-play, and finally to MuZero, which additionally learned a model of its environment, illustrates a compelling trajectory towards more general and autonomous AI.
+
+\section{AlphaGo: Mastering Go with Deep Neural Networks and Tree Search}
+AlphaGo \cite{alphago} was the first computer program to defeat a human professional Go player, a feat that underscored the potential of combining deep neural networks with Monte Carlo Tree Search (MCTS). Its success relied on a multi-stage training pipeline and several interacting components.
+
+\subsection{Approach Description}
+AlphaGo's architecture comprised three main neural network components and a sophisticated MCTS algorithm:
 \begin{enumerate}
-    \item Explain the core technical contributions of AlphaGo~\cite{alphago}, AlphaZero~\cite{alphazero}, and MuZero~\cite{muzero}.
-    \item Discuss the mathematical principles of their learning and search processes.
-    \item Contextualize these methods within the broader landscape of Reinforcement Learning.
-    \item Offer a critical evaluation of their strengths, weaknesses, and overall impact.
+    \item \textbf{Supervised Learning (SL) Policy Network ($p_{\sigma}$):} This network was trained to predict human expert moves from a large dataset of Go games. It took the current board state $s$ as input and outputted a probability distribution $p_{\sigma}(a|s)$ over possible actions $a$. This provided a strong initial policy capable of human-like play.
+    \item \textbf{Reinforcement Learning (RL) Policy Network ($p_{\rho}$):} The SL policy network was further refined through self-play. The RL policy network $p_{\rho}$ was initialized with the weights of $p_{\sigma}$ and then played games against previous versions of itself. Its parameters were updated using policy gradient methods to maximize the probability of winning.
+    \item \textbf{Value Network ($v_{\theta}$):} This network was trained to predict the expected outcome (win/loss) from a given board position $s$. That is, $v_{\theta}(s) \approx \mathbb{E}[z|s, p_{\rho}]$, where $z$ is the final game outcome when played by the RL policy $p_{\rho}$. It was trained on data generated from self-play games between RL policy networks.
+    \item \textbf{Monte Carlo Tree Search (MCTS):} AlphaGo's MCTS algorithm integrated the policy and value networks to guide its search.
+    \begin{itemize}
+        \item \textbf{Selection:} In each simulation, actions were selected within the tree to maximize an action-value $Q(s,a)$ plus an upper confidence bound (UCB) bonus $u(s,a)$. The action $a_t$ at state $s_t$ was chosen as:
+        \[ a_t = \arg\max_a (Q(s_t,a) + u(s_t,a)) \]
+        The bonus term $u(s,a)$ was proportional to the prior probability $P(s,a)$ from the SL policy network and inversely proportional to the visit count $N(s,a)$ for that action: $u(s,a) \propto \frac{P(s,a)}{1+N(s,a)}$. This encouraged exploration of promising moves that had not been visited often.
+        \item \textbf{Expansion:} When a simulation reached a leaf node $s_L$ (a state not yet in the tree), the node was expanded. The SL policy network $p_\sigma(a|s_L)$ was used to provide prior probabilities $P(s_L,a)$ for newly expanded actions.
+        \item \textbf{Evaluation:} The leaf node $s_L$ was evaluated using a combination of the value network's output $v_{\theta}(s_L)$ and the outcome $z_L$ of a fast rollout played to the end of the game using a simpler, linear softmax policy $p_{\pi}$. The final evaluation $V(s_L)$ was a weighted average:
+        \[ V(s_L) = (1-\lambda)v_{\theta}(s_L) + \lambda z_L \]
+        where $\lambda$ is a mixing parameter.
+        \item \textbf{Backup:} After evaluation, the visit counts $N(s,a)$ for all traversed edges were incremented, and their action values $Q(s,a)$ were updated to be the mean of all evaluations $V(s_L')$ in the subtree below $(s,a)$.
+    \end{itemize}
 \end{enumerate}
 
-\section{The AlphaGo Family: An Evolutionary Journey}
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=0.7\textwidth]{figures/alphago.png}
+    \caption{AlphaGo's architecture, showing the interaction between the rollout policy, SL policy network, RL policy network, and value network. The SL policy network is trained on human expert positions, while the RL policy network and value network are trained through self-play. MCTS uses these networks to guide its search (Image source: \href{https://jonathan-hui.medium.com/alphago-how-it-works-technically-26ddcc085319}{link}).}
+    \label{fig:alphago_architecture}
+\end{figure}
 
-The AlphaGo family represents a clear progression in reducing reliance on domain-specific knowledge and human data, moving towards more general and autonomous learning agents.
-
-\subsection{AlphaGo (Silver et al., 2016)~\cite{alphago}}
-AlphaGo was the first program to defeat a human professional Go player and later a world champion (Lee Sedol). Its architecture was a sophisticated blend of deep neural networks and Monte Carlo Tree Search (MCTS).
-
-\textbf{Core Components:}
+\subsection{Mathematical Details}
+The training of AlphaGo's networks involved distinct loss functions:
 \begin{itemize}
-    \item \textbf{Policy Network ($p_{\sigma}$):} Trained via supervised learning (SL) on a large dataset of human expert games to predict expert moves. Input: board state $s$. Output: probability distribution $p_{\sigma}(a|s)$ over actions $a$. The update rule for SL is a standard gradient ascent to maximize log-likelihood:
-    \begin{equation}
-        \Delta \sigma \propto \frac{\partial \log p_{\sigma}(a|s)}{\partial \sigma}
-    \end{equation}
-    \item \textbf{Fast Rollout Policy ($p_{\pi}$):} A simpler, faster linear softmax policy also trained on human expert data, used for quick playouts during MCTS simulations.
-    \item \textbf{Reinforcement Learning (RL) Policy Network ($p_{\rho}$):} Initialized from the SL policy network $p_{\sigma}$, this network was further improved through self-play. Games were played between current and previous versions of the policy network. The update rule is a policy gradient method (akin to REINFORCE):
-    \begin{equation}
-        \Delta \rho \propto \frac{\partial \log p_{\rho}(a_t|s_t)}{\partial \rho} z_t
-    \end{equation}
-    where $z_t = \pm 1$ is the terminal reward (win/loss) from the perspective of the current player at time $t$.
-    \item \textbf{Value Network ($v_{\theta}$):} Trained to predict the outcome (probability of winning) from a given board position $s$, when games are played by the RL policy network $p_{\rho}$ against itself. It is trained by regression to minimize the mean squared error (MSE) between the predicted value $v_{\theta}(s)$ and the actual game outcome $z$:
-    \begin{equation}
-        \Delta \theta \propto \frac{\partial v_{\theta}(s)}{\partial \theta} (z - v_{\theta}(s))
-    \end{equation}
-    \item \textbf{Monte Carlo Tree Search (MCTS):} AlphaGo's MCTS algorithm integrated these components.
-    \begin{itemize}
-        \item \textbf{Selection:} Traversed the tree by selecting actions $a_t$ at each state $s_t$ to maximize an action-value $Q(s_t, a)$ plus a bonus $u(s_t, a)$ based on the SL policy network's prior probability $P(s,a) = p_{\sigma}(a|s)$:
-        \begin{equation}
-            a_t = \underset{a}{\arg\max} \left( Q(s_t, a) + u(s_t, a) \right), \quad \text{where } u(s,a) \propto \frac{P(s,a)}{1+N(s,a)}
-        \end{equation}
-        $N(s,a)$ is the visit count of edge $(s,a)$.
-        \item \textbf{Expansion:} When a leaf node $s_L$ was reached, it was expanded. The SL policy network $p_{\sigma}$ provided prior probabilities for new actions.
-        \item \textbf{Evaluation:} The leaf node $s_L$ was evaluated in two ways: by the value network $v_{\theta}(s_L)$ and by a Monte Carlo rollout to the end of the game using the fast rollout policy $p_{\pi}$ to get an outcome $z_L$. These were combined: $V(s_L) = (1-\lambda)v_{\theta}(s_L) + \lambda z_L$.
-        \item \textbf{Backup:} Action-values $Q(s,a)$ and visit counts $N(s,a)$ were updated based on the evaluations.
-    \end{itemize}
-\end{itemize}
-AlphaGo's success was remarkable, but it relied on supervised learning from human data for initial policy learning and featured distinct, separately trained network components.
-
-\subsection{AlphaZero (Silver et al., 2017)~\cite{alphazero}}
-AlphaZero marked a significant step towards generality. It learned to play Go, chess, and shogi from scratch (tabula rasa), without any human data, domain-specific heuristics (beyond game rules), or handcrafted features.
-
-\textbf{Core Innovations:}
-\begin{itemize}
-    \item \textbf{Single Neural Network ($f_{\theta}$):} A single, deep neural network $f_{\theta}(s) = (\mathbf{p}, v)$ takes the board state $s$ as input and outputs both a policy vector $\mathbf{p}$ (probabilities $P_{\theta}(a|s)$ for all actions) and a scalar value $v$ (predicted outcome $v_{\theta}(s)$).
-    \item \textbf{Pure Self-Play Reinforcement Learning:} The network is trained entirely from games of self-play.
-    \item \textbf{MCTS Modification:}
-    \begin{itemize}
-        \item \textbf{Selection:} The MCTS selection step uses an Upper Confidence Bound for Trees (UCT) variant similar to AlphaGo, but the prior probabilities $P_{\theta}(a_i|s_t)$ now come directly from the policy head of the single network $f_{\theta}$. The action $a_t^{UCB1}$ is selected at state $s_t$ according to:
-        \begin{equation}
-            a_t^{UCB1} = \underset{a_i \in \mathcal{A}}{\arg\max} \left( Q(s_t, a_i) + c P_{\theta}(a_i|s_t) \frac{\sqrt{\sum_b N(s_t, b)}}{1 + N(s_t, a_i)} \right)
-        \end{equation}
-        where $c$ is an exploration constant. (Note: The slides use $t(S_t)$ for $\sum_b N(s_t, b)$).
-        \item \textbf{Expansion and Evaluation:} When a leaf node $s_L$ is expanded, its value $v$ and policy priors $\mathbf{p}$ are obtained directly from the single network $f_{\theta}(s_L)$. There are \textit{no Monte Carlo rollouts} to the end of the game; the value head $v_{\theta}(s_L)$ provides the sole evaluation for backpropagation.
-        \item \textbf{Action Execution during Self-Play:} The policy $\pi(s,a)$ for executing moves during self-play is based on the visit counts $N(s_t, a_i)$ from the MCTS at the root state $s_t$:
-        \begin{equation}
-            \pi(s_t, a_i) = \frac{N(s_t, a_i)}{\sum_b N(s_t, b)}
-        \end{equation}
-        Often, temperature is used to encourage exploration in early game stages.
-    \end{itemize}
-    \item \textbf{Learning:} The network $f_{\theta}$ is trained on data $(s_t, \pi(s_t), z_t)$ collected from self-play games, where $\pi(s_t)$ is the MCTS search policy and $z_t$ is the final game outcome. The loss function $l$ minimizes both the error in the value prediction and the mismatch between the network's policy $\mathbf{p}_{\theta}(s_t)$ and the MCTS search policy $\pi(s_t)$:
-    \begin{equation}
-        l = \sum_t \left( (v_{\theta}(s_t) - z_t)^2 - \pi(s_t)^T \log(\mathbf{p}_{\theta}(s_t)) \right) + c' ||\theta||^2
-    \end{equation}
-    The first term is the MSE for the value head, the second is the cross-entropy loss for the policy head, and $c'$ is an L2 regularization parameter.
-\end{itemize}
-AlphaZero achieved superhuman performance in Go, chess, and shogi, surpassing specialized programs and AlphaGo itself, demonstrating remarkable generality. However, it still required a perfect simulator of the game (the rules) to perform MCTS expansions.
-
-\subsection{MuZero (Schrittwieser et al., 2019)~\cite{muzero}}
-MuZero took generality a step further by learning to master games \textit{without knowing their rules}. It combines tree-based search with a learned model of the environment's dynamics.
-
-\textbf{Core Innovations:}
-MuZero introduces three core neural network components, all learned end-to-end:
-\begin{itemize}
-    \item \textbf{Representation Function ($h_{\theta}$):} Maps a history of recent observations $o_1, ..., o_t$ to an initial hidden state $s^0 = h_{\theta}(o_1, ..., o_t)$. This $s^0$ forms the root of the MCTS.
-    \item \textbf{Dynamics Function ($g_{\theta}$):} Given a previous hidden state $s^{k-1}$ and a candidate action $a^k$ (hypothetically taken within the MCTS), it predicts the next hidden state $s^k$ and the immediate reward $r^k$:
-    \begin{equation}
-        r^k, s^k = g_{\theta}(s^{k-1}, a^k)
-    \end{equation}
-    This function allows MuZero to "simulate" future states and rewards internally.
-    \item \textbf{Prediction Function ($f_{\theta}$):} Similar to AlphaZero's network, it takes a hidden state $s^k$ (either $s^0$ from $h_{\theta}$ or $s^k$ from $g_{\theta}$) and predicts a policy $\mathbf{p}^k$ and a value $v^k$:
-    \begin{equation}
-        \mathbf{p}^k, v^k = f_{\theta}(s^k)
-    \end{equation}
-    \item \textbf{MCTS within the Learned Model:} MCTS is performed using these learned functions.
-    \begin{itemize}
-        \item Starting from $s^0=h_{\theta}(\text{observations})$.
-        \item Transitions within the tree use $s^k = g_{\theta}(s^{k-1}, a^k)$.
-        \item Policy priors and node evaluations use $\mathbf{p}^k, v^k = f_{\theta}(s^k)$.
-        \item The MCTS accumulates the predicted rewards $r^k$ along a trajectory.
-    \end{itemize}
-    \item \textbf{Learning:} The model $(\theta)$ is trained to predict three quantities simultaneously for $K$ unrolled steps:
-    \begin{enumerate}
-        \item The policy $\mathbf{p}_t^k$ should match the MCTS search policy $\pi_{t+k}$.
-        \item The value $v_t^k$ should match the actual (target) value $z_{t+k}$ (e.g., n-step return or game outcome).
-        \item The reward $r_t^k$ should match the observed reward $u_{t+k}$ from the environment.
-    \end{enumerate}
-    The overall loss function is a sum of these individual losses:
-    \begin{equation}
-        L_t(\theta) = \sum_{k=0}^{K} \left( L^r(u_{t+k}, r_t^k) + L^v(z_{t+k}, v_t^k) + L^p(\pi_{t+k}, \mathbf{p}_t^k) \right) + c'' ||\theta||^2
-    \end{equation}
-    where $L^r, L^v, L^p$ are specific loss functions (e.g., cross-entropy for categorical rewards/values, MSE for continuous, cross-entropy for policy).
-\end{itemize}
-MuZero matched AlphaZero's performance in Go, chess, and shogi, and achieved state-of-the-art results in the Atari benchmark, all without being given the rules of the games. This demonstrates a significant step towards general-purpose, model-based RL.
-
-\section{Contextualization with Broader RL Concepts}
-The AlphaGo family integrates and advances several key RL concepts:
-\begin{itemize}
-    \item \textbf{Model-Free vs. Model-Based RL:}
-        \begin{itemize}
-            \item \textbf{AlphaGo and AlphaZero} are primarily model-free in their learning approach for the policy and value networks. They learn directly from experience (self-play outcomes $z_t$). However, their MCTS component relies on a perfect model of the environment (the game simulator) for state transitions during search.
-            \item \textbf{MuZero} is explicitly a model-based RL algorithm. It learns a model of the environment's dynamics ($g_{\theta}$), rewards ($g_{\theta}$), and relevant state representations ($h_{\theta}$, $s^k$). Planning (MCTS) then occurs entirely within this learned model. This is a significant departure and aligns with a long-standing goal in RL to combine the data efficiency of model-based methods with the performance of model-free methods.
-        \end{itemize}
-    \item \textbf{Monte Carlo Tree Search (MCTS):} MCTS is the backbone of the planning component in all three systems. It's a powerful heuristic search algorithm for decision processes, balancing exploration and exploitation. The AlphaGo family showcases how deep learning can guide MCTS (providing priors and evaluations) far more effectively than traditional heuristics or random rollouts. AlphaZero's elimination of explicit rollouts in favor of learned value estimates was a key simplification. MuZero further evolves this by performing MCTS within a learned latent space.
-    \item \textbf{Deep Learning for Function Approximation:} All three systems leverage deep convolutional neural networks (CNNs) to represent the policy and value functions (and the model in MuZero). This allows them to handle high-dimensional state spaces (like a Go board) and learn complex patterns without manual feature engineering. The use of residual networks (ResNets) in AlphaZero and MuZero was crucial for training very deep networks.
-    \item \textbf{Policy Gradients and Value-Based Learning:}
-        \begin{itemize}
-            \item AlphaGo's RL policy network ($p_{\rho}$) was trained using a policy gradient method similar to REINFORCE, learning from the final game outcome.
-            \item All three systems employ value networks ($v_{\theta}$) trained to predict outcomes, which is a form of value-based learning. The loss function for AlphaZero and MuZero directly incorporates targets derived from MCTS-improved policies ($\pi$) and game outcomes ($z_t$), effectively performing policy iteration where MCTS is the policy improvement operator and network training is the policy evaluation and fitting step.
-        \end{itemize}
-    \item \textbf{Self-Play:} This is a crucial data generation mechanism, especially for AlphaZero and MuZero which learn tabula rasa. By playing against continually improving versions of itself, the agent explores the state space and generates high-quality training data.
-    \item \textbf{Planning and Learning Integration:} A core theme is the tight integration of lookahead search (planning via MCTS) and function approximation (learning via NNs). MCTS provides strong training targets for the NNs, and the NNs, in turn, make MCTS much more efficient. MuZero exemplifies this by having the learned model itself be the environment for planning.
+    \item \textbf{SL Policy Network ($p_{\sigma}$):} Trained by maximizing the log-likelihood of human expert moves $a$ in state $s$:
+    \[ \Delta\sigma \propto \frac{\partial \log p_{\sigma}(a|s)}{\partial \sigma} \]
+    \item \textbf{RL Policy Network ($p_{\rho}$):} Trained using a policy gradient method (REINFORCE) to maximize the expected outcome $z_t \in \{-1, +1\}$ (win/loss from perspective of current player at time $t$):
+    \[ \Delta\rho \propto \frac{\partial \log p_{\rho}(a_t|s_t)}{\partial \rho} z_t \]
+    \item \textbf{Value Network ($v_{\theta}$):} Trained by minimizing the mean squared error (MSE) between its prediction $v_{\theta}(s)$ and the actual game outcome $z$ from self-play games:
+    \[ \Delta\theta \propto \frac{\partial v_{\theta}(s)}{\partial \theta} (z - v_{\theta}(s)) \quad \text{(minimizing } (z - v_{\theta}(s))^2 \text{ loss)} \]
 \end{itemize}
 
-\section{Evaluation and Critique}
+\subsection{Contextualization and Critique}
+AlphaGo's victory was a landmark, demonstrating that complex games like Go were solvable with a combination of deep learning and tree search. The use of MCTS, policy evaluation via self-play, and the ability to beat human masters are all core RL concepts evident in AlphaGo.
 
 \textbf{Strengths:}
 \begin{itemize}
-    \item \textbf{Superhuman Performance:} Achieved and surpassed human world-champion levels in highly complex games.
-    \item \textbf{Generality:} AlphaZero and especially MuZero demonstrated applicability across different games and even different types of environments (board games and Atari), with MuZero removing the need for a game simulator.
-    \item \textbf{Learning from Scratch:} AlphaZero and MuZero's tabula rasa learning is a significant achievement, reducing reliance on human expertise or data.
-    \item \textbf{Discovering Novel Strategies:} The systems often discovered strategies and patterns not previously known or favored by human experts, enriching human understanding of these games.
-    \item \textbf{Architectural Evolution:} The progression from separate, specialized networks in AlphaGo to a single, unified network in AlphaZero, and then to a learned model in MuZero, shows a clear path towards more elegant and powerful architectures.
+    \item Achieved superhuman performance in Go, a long-standing AI grand challenge.
+    \item Innovatively combined supervised learning from human data, Reinforcement Learning from self-play, and Monte Carlo tree search.
+    \item The policy network effectively pruned the search space for MCTS, and the value network provided a more accurate evaluation than traditional rollouts alone.
 \end{itemize}
 
-\textbf{Limitations and Criticisms:}
+\textbf{Limitations:}
 \begin{itemize}
-    \item \textbf{Computational Cost and Sample Inefficiency:} Training these systems requires enormous computational resources (e.g., hundreds or thousands of TPUs/GPUs for days or weeks) and vast amounts of experience (e.g., AlphaZero played 4.9 million games of Go for its initial training run for the 3-day experiment, and 29 million for the 40-day run). While impressive, this is far beyond human learning capabilities in terms of raw experience.
-    \item \textbf{Perfect Information and Deterministic Environments (Initially):} AlphaGo and AlphaZero were designed for and excelled in fully observable, deterministic, two-player zero-sum games. MuZero extends this to single-agent and stochastic environments (like Atari), but challenges remain for partially observable environments or games with very long horizons and sparse rewards without carefully designed n-step returns or other auxiliary signals.
-    \item \textbf{Reliance on MCTS:} While MCTS is powerful, it has its own computational demands (e.g., AlphaZero used 1600 simulations per move in some Go experiments). The performance heavily relies on the quality of the MCTS search, which is guided by the learned components. It's unclear how these approaches would fare in domains where MCTS is less suitable (e.g., continuous action spaces without effective discretization, or extremely large branching factors where even guided search is intractable).
-    \item \textbf{Learned Model Complexity (MuZero):} While MuZero's learned model is a breakthrough, training such a model accurately for complex, stochastic, and partially observable environments is extremely challenging. The model only needs to predict quantities relevant for planning (value, policy, reward), not reconstruct observations, which helps, but it can still suffer from compounding errors over long rollouts within the model.
-    \item \textbf{Interpretability:} The strategies learned by these deep neural networks are often opaque, making it difficult to understand \textit{why} a particular move is chosen, beyond the network's output probabilities and values.
-    \item \textbf{Requirement of Rules (AlphaZero):} As noted on slide 7, AlphaZero still requires knowledge of game rules to run MCTS. MuZero addresses this critical limitation by learning the rules implicitly through its dynamics model $g_{\theta}$.
-    \item \textbf{Still Generates a Tree (AlphaZero/MuZero in production):} Slide 7 raises the question for AlphaZero (and it applies to MuZero) of why, when playing in production, the system still generates a search tree rather than just using the learned policy directly. The answer is that MCTS acts as a policy improvement operator; even a very strong learned policy can be further improved by lookahead search, leading to better performance, especially in critical game situations. The raw policy network in AlphaZero (and MuZero) is strong, but MCTS consistently makes it stronger.
+    \item \textbf{Reliance on Human Data:} The initial SL policy network required a large dataset of human expert games, limiting its applicability to domains without such data.
+    \item \textbf{Domain-Specific Knowledge:} While the neural networks learned features, the MCTS component inherently relied on a perfect simulator (i.e., knowledge of Go rules) to transition between states and determine legal moves.
+    \item \textbf{Multiple Networks and Complex Pipeline:} The training involved several distinct networks ($p_{\sigma}, p_{\rho}, v_{\theta}, p_{\pi}$) and a multi-stage pipeline, increasing complexity.
+    \item \textbf{Fast Rollouts:} MCTS still used fast rollouts for leaf evaluation, which, while computationally cheaper than full value network evaluations at every step of a rollout, still represented a computational cost and a potential source of noise.
 \end{itemize}
+AlphaGo laid the groundwork for future systems by proving the viability of its core ideas, but its limitations paved the way for the development of more general and streamlined algorithms.
+
+\section{AlphaZero: Mastering Games by Self-Play with a General RL Algorithm}
+AlphaZero \cite{alphazero} represented a significant step towards more general game-playing AI, building upon AlphaGo's success while addressing some of its key limitations. It demonstrated the ability to achieve superhuman performance in Go, Chess, and Shogi, starting entirely from random play (tabula rasa) without any human data or domain-specific heuristics beyond the game rules.
+
+\subsection{Approach Description}
+AlphaZero introduced several key simplifications and generalizations compared to AlphaGo:
+\begin{enumerate}
+    \item \textbf{Tabula Rasa Learning:} AlphaZero learned entirely through self-play Reinforcement Learning, starting with random weights and no prior human game data. This was a crucial departure from AlphaGo's reliance on supervised pre-training.
+    \item \textbf{Single Neural Network ($f_{\theta}$):} Instead of separate policy and value networks, AlphaZero used a single, deeper neural network $f_{\theta}$ that took the board state $s$ as input and outputted both a policy vector $\mathbf{p}_{\theta}$ and a scalar value $v_{\theta}$: $(\mathbf{p}_{\theta}, v_{\theta}) = f_{\theta}(s)$. The policy vector $\mathbf{p}_{\theta}$ represented the probabilities $P_{\theta}(a|s)$ for each action, and $v_{\theta}$ estimated the expected outcome from state $s$.
+    \item \textbf{No Fast Rollouts in MCTS:} The MCTS algorithm in AlphaZero relied solely on the value $v_{\theta}$ predicted by the neural network for evaluating leaf nodes. This eliminated the need for the fast rollout policy $p_{\pi}$ used in AlphaGo, simplifying the search and making evaluations more consistent.
+    \item \textbf{Generality:} The same algorithm, network architecture (with minor game-specific input/output adaptations), and hyperparameters were used across Go, Chess, and Shogi, demonstrating its generality.
+\end{enumerate}
+
+\textbf{MCTS in AlphaZero:}
+The MCTS in AlphaZero was also refined:
+\begin{itemize}
+    \item \textbf{Selection:} Actions within the tree were selected using a variant of the PUCT (Polynomial Upper Confidence trees) algorithm. At state $s_t$, the action $a$ was chosen to maximize:
+    \[ Q(s_t, a) + U(s_t, a) \]
+    where $U(s_t, a) = c_{\text{puct}} P_{\theta}(a|s_t) \frac{\sqrt{\sum_b N(s_t, b)}}{1 + N(s_t, a)}$. Here, $P_{\theta}(a|s_t)$ is the prior probability from the policy head of the network $f_{\theta}$, $N(s_t,a)$ is the visit count of edge $(s_t,a)$, $\sum_b N(s_t,b)$ is the visit count of the parent state $s_t$, and $c_{\text{puct}}$ is a constant controlling exploration.
+    \item \textbf{Expansion and Evaluation:} When a leaf node $s_L$ was reached, it was expanded. The neural network $f_{\theta}$ was called once to evaluate $s_L$, yielding $(\mathbf{p}_{\theta}(s_L), v_{\theta}(s_L))$. The value $v_{\theta}(s_L)$ was then used directly for the backup phase.
+    \item \textbf{Backup:} The action values $Q(s,a)$ and visit counts $N(s,a)$ along the traversed path were updated based on the evaluation $v_{\theta}(s_L)$.
+    \item \textbf{Action Selection during Self-Play:} For generating self-play data, after MCTS was completed for the current state $s_t$, an action $a_t$ was sampled from the improved policy $\pi_t(a|s_t) \propto N(s_t,a)^{1/\tau}$, where $\tau$ is a temperature parameter that controls exploration (initially $\tau=1$, then $\tau \to 0$ for greedy play). The training targets $\pi_t$ are these MCTS visit count distributions.
+\end{itemize}
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=0.7\textwidth]{figures/alphazero.png}
+    \caption{AlphaZero's architecture, showing the single neural network $f_{\theta}$ (inspired by ResNet, with residual blocks) that outputs both policy and value predictions. MCTS uses this network to guide its search without fast rollouts (Image source: \href{https://www.researchgate.net/figure/AlphaZero-network-architecture_fig2_380820164}{link}).}
+    \label{fig:alphazero_architecture}
+\end{figure}
+
+\subsection{Mathematical Details}
+AlphaZero's single neural network $f_{\theta}$ was trained using a combined loss function that aimed to simultaneously improve both policy and value predictions. For each state $s_t$ encountered during self-play, with MCTS-derived policy $\pi_t$ and eventual game outcome $z_t$, the loss $l$ was:
+\[ l = (v_{\theta}(s_t) - z_t)^2 - \boldsymbol{\pi}_t^T \log \mathbf{p}_{\theta}(s_t) + c ||\theta||^2 \]
+This loss function consists of:
+\begin{itemize}
+    \item An MSE term $(v_{\theta}(s_t) - z_t)^2$ for the value head, encouraging $v_{\theta}(s_t)$ to predict the actual game outcome $z_t$.
+    \item A cross-entropy term $-\boldsymbol{\pi}_t^T \log \mathbf{p}_{\theta}(s_t)$ for the policy head, encouraging the network's policy $\mathbf{p}_{\theta}(s_t)$ to match the MCTS search policy $\boldsymbol{\pi}_t$.
+    \item An L2 weight regularization term $c||\theta||^2$ to prevent overfitting.
+\end{itemize}
+
+\subsection{Contextualization and Critique}
+AlphaZero marked a significant advance by demonstrating that superhuman performance could be achieved without human data, relying purely on self-play and a general Reinforcement Learning algorithm. This addressed a major limitation of AlphaGo. The unification into a single network and removal of fast rollouts simplified the system.
+
+\textbf{Strengths:}
+\begin{itemize}
+    \item \textbf{Tabula Rasa Learning:} Achieved superior performance without any human data, demonstrating true self-learning.
+    \item \textbf{Generality:} The same algorithm successfully mastered Go, Chess, and Shogi, highlighting its broad applicability to different perfect information games.
+    \item \textbf{Improved Performance and Simplicity:} Outperformed AlphaGo and had a more elegant, streamlined architecture and training process.
+    \item \textbf{State-of-the-Art MCTS:} The integration of the policy prior directly into the UCB calculation (PUCT) became a standard in subsequent MCTS-based agents.
+\end{itemize}
+
+\textbf{Limitations:}
+\begin{itemize}
+    \item \textbf{Requires Perfect Simulator:} Like AlphaGo, AlphaZero's MCTS still required a perfect model of the environment (i.e., the game rules) to provide legal moves and transition between states within the search tree. This limited its direct application to domains where such a simulator is unavailable.
+    \item \textbf{Computational Resources:} Training AlphaZero required substantial computational resources for the extensive self-play and MCTS computations. For example, the original AlphaZero run used 5,000 first-generation TPUs for generating self-play games and 64 second-generation TPUs for training the neural networks.
+    \item \textbf{Zero-Sum Games:} The algorithm was primarily demonstrated on two-player, zero-sum games with perfect information.
+\end{itemize}
+AlphaZero's success fueled further research into general game playing and self-learning systems, setting the stage for algorithms that could operate even without explicit knowledge of environment dynamics.
+
+\section{MuZero: Mastering Atari, Go, Chess and Shogi by Planning with a Learned Model}
+MuZero \cite{muzero} took the principles of AlphaZero a step further by removing the requirement of knowing the environment's rules or having access to a perfect simulator. It achieved this by learning its own model of the environment dynamics, enabling it to plan in a learned latent space. This allowed MuZero to master not only board games like Go, Chess, and Shogi, but also visually complex Atari games, all without prior knowledge of their rules.
+
+\subsection{Approach Description}
+The core innovation of MuZero is its ability to learn a model that predicts only the aspects of the environment relevant for planning: the policy, value, and reward. It consists of three main neural network components, typically part of a single, larger network:
+\begin{enumerate}
+    \item \textbf{Representation Function ($h_{\theta}$):} This function takes a sequence of past observations $o_1, \dots, o_t$ (e.g., screen pixels in Atari, board configurations in Go) and maps them to an initial hidden state $s^0 = h_{\theta}(o_1, \dots, o_t)$. This hidden state serves as the starting point for planning.
+    \item \textbf{Dynamics Function ($g_{\theta}$):} This function models the environment's transitions in the learned latent space. Given a previous hidden state $s^{k-1}$ and a hypothetical action $a^k$ to take from that state, it predicts the next hidden state $s^k$ and the immediate reward $r^k$: $(r^k, s^k) = g_{\theta}(s^{k-1}, a^k)$.
+    \item \textbf{Prediction Function ($f_{\theta}$):} Similar to AlphaZero's network, this function takes a hidden state $s^k$ as input and outputs a policy $\mathbf{p}^k$ (probabilities for actions) and a value $v^k$ (predicted future cumulative discounted reward): $(\mathbf{p}^k, v^k) = f_{\theta}(s^k)$.
+\end{enumerate}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.7\textwidth]{figures/muzero.png}
+    \caption{MuZero's architecture, showing the representation function $h_{\theta}$, dynamics function $g_{\theta}$, and prediction function $f_{\theta}$. The MCTS operates in the learned latent space, using these functions to simulate future states and rewards (Image source: \href{https://www.furidamu.org/blog/2020/12/22/muzero-intuition/}{link}).}
+    \label{fig:muzero_architecture}
+\end{figure}
+
+\textbf{MCTS with the Learned Model:}
+MuZero performs MCTS by ``unrolling'' its learned model.
+\begin{itemize}
+    \item Starting from an initial hidden state $s^0$ (derived from real observations via $h_{\theta}$), the MCTS explores sequences of hypothetical future actions $a^1, a^2, \dots$.
+    \item At each step $k$ in a simulation path within the MCTS tree, if the agent considers taking action $a^k$ from state $s^{k-1}$:
+        \begin{itemize}
+            \item The dynamics function $g_{\theta}$ is used to predict the next hidden state $s^k$ and reward $r^k$.
+            \item The prediction function $f_{\theta}$ is then used on $s^k$ to get the policy $\mathbf{p}^k$ (used as priors for expanding from $s^k$) and the value $v^k$ (used for evaluation if $s^k$ is a leaf node in this simulation path).
+        \end{itemize}
+    \item The MCTS selection rule, expansion, and backup are similar to AlphaZero's PUCT-based search, but operate entirely within the space of learned hidden states and use the predicted rewards $r^k$, policies $\mathbf{p}^k$, and values $v^k$.
+\end{itemize}
+
+\textbf{Training:}
+The three functions ($h_{\theta}, g_{\theta}, f_{\theta}$) are trained jointly and end-to-end. The goal is to make the predictions of the learned model consistent with observed data and MCTS-improved targets. For a trajectory segment, the overall loss $l_t(\theta)$ at time $t$ considers $K$ steps of unrolling the model:
+\[ l_t(\theta) = \sum_{k=0}^{K} \left[ l^r(u_{t+k}, r_t^k) + l^v(z_{t+k}, v_t^k) + l^p(\boldsymbol{\pi}_{t+k}, \mathbf{p}_t^k) \right] + c||\theta||^2 \]
+where:
+\begin{itemize}
+    \item $u_{t+k}$ is the true observed reward from the environment at step $t+k$. $r_t^k$ is the reward predicted by $g_{\theta}$ for the $k$-th step in the imagined trajectory starting from observations up to $t$. $l^r$ is the reward prediction loss.
+    \item $z_{t+k}$ is the target value for the state reached after $k$ imagined steps. For board games, this is the final game outcome. For Atari, this is typically an $N$-step bootstrapped return: $z_{t+k} = \sum_{i=0}^{N-1} \gamma^i u_{t+k+i} + \gamma^N v_{\text{MCTS}}(s_{t+k+N})$, where $v_{\text{MCTS}}$ is the MCTS-derived value of the state $N$ steps into the future. $v_t^k$ is the value predicted by $f_{\theta}$. $l^v$ is the value prediction loss.
+    \item $\boldsymbol{\pi}_{t+k}$ is the MCTS-improved policy target for the state reached after $k$ imagined steps. $\mathbf{p}_t^k$ is the policy predicted by $f_{\theta}$. $l^p$ is the policy prediction loss.
+    \item $c||\theta||^2$ is an L2 regularization term.
+\end{itemize}
+This loss trains the representation function $h_{\theta}$ to produce a useful initial state, the dynamics function $g_{\theta}$ to accurately predict future states (in terms of their value/policy/reward consequences) and rewards, and the prediction function $f_{\theta}$ to predict policies and values consistent with search and actual outcomes.
+
+\subsection{Contextualization and Critique}
+MuZero's primary contribution is its ability to perform effective planning without knowing the rules of the environment, a significant step towards general AI.
+
+\textbf{Strengths:}
+\begin{itemize}
+    \item \textbf{No Game Rules Required:} MuZero learns its own model of dynamics, making it applicable to environments where rules are unknown or too complex to specify, including visually rich Atari games.
+    \item \textbf{State-of-the-Art Performance Across Diverse Domains:} Demonstrated superhuman performance in Go, Chess, Shogi, and achieved new SOTA in Atari, showcasing its versatility.
+    \item \textbf{End-to-End Learning of Model and Policy/Value:} The joint training of representation, dynamics, and prediction functions allows the system to learn a model optimized for planning.
+\end{itemize}
+
+\textbf{Limitations:}
+\begin{itemize}
+    \item \textbf{Complexity of Model Learning:} Learning an accurate and useful model of environment dynamics, even one focused only on planning-relevant quantities, is a challenging task, especially in complex or stochastic environments.
+    \item \textbf{Potential for Model Exploitation and Compounding Errors:} Planning with a learned model can suffer if the model has inaccuracies. Errors can compound over longer planning horizons, leading to suboptimal plans. MuZero's focus on predicting value/policy/reward rather than full state reconstruction might mitigate this but doesn't eliminate it.
+    \item \textbf{Sample Efficiency and Computational Cost:} While MuZero can learn without rules, learning an effective model and then planning with it can still be sample-intensive and computationally expensive, especially compared to highly optimized model-free methods in some domains (though MuZero Reanalyze improved sample efficiency significantly in Atari).
+    \item \textbf{Focus on Deterministic Dynamics in Original Paper:} The original MuZero paper focused on environments with deterministic dynamics or where the stochasticity could be implicitly captured. Extending learned models to explicitly handle significant stochasticity remains a challenge.
+\end{itemize}
+MuZero represents a powerful fusion of model-based and model-free RL ideas, pushing the boundaries of what can be achieved with learned world models and tree search.
+
+\section{Comparative Analysis and Evolution}
+The journey from AlphaGo to AlphaZero, and then to MuZero, showcases a clear evolutionary path towards more general and autonomous Reinforcement Learning agents.
+\begin{itemize}
+    \item \textbf{AlphaGo to AlphaZero:} The primary shift was the elimination of reliance on human expert data and the move to pure self-play. Architecturally, this involved unifying the separate policy and value networks into a single network and removing the fast rollout policy from MCTS. This simplification led to a more general algorithm applicable to multiple games (Chess, Shogi, Go) with minimal changes, at the cost of requiring more computation for initial learning from scratch.
+    \item \textbf{AlphaZero to MuZero:} The most significant evolution was the removal of the requirement for a perfect simulator or knowledge of game rules. MuZero achieved this by learning its own internal model of the environment's dynamics, specifically tailored for planning. This involved introducing explicit representation, dynamics, and prediction functions. While adding complexity in terms of what needs to be learned (the model itself), it granted the system unprecedented generality, allowing it to tackle environments like Atari where rules are not easily provided.
+\end{itemize}
+
+\textbf{Common Threads:}
+Despite their differences, all three algorithms share core principles:
+\begin{enumerate}
+    \item \textbf{Monte Carlo Tree Search (MCTS):} MCTS remains the central planning algorithm, providing a powerful way to explore the state space and improve policy estimates.
+    \item \textbf{Deep Neural Networks:} Deep learning is used for powerful function approximation, learning policy distributions, value functions, and, in MuZero's case, environment models.
+    \item \textbf{Self-Play:} Self-play (or interaction with the environment in MuZero's Atari case) is the primary mechanism for generating data and driving the learning process, allowing the agents to continuously improve beyond fixed datasets.
+\end{enumerate}
+
+The evolution demonstrates a clear trend: reducing external dependencies (human data, explicit rules) and increasing the scope of what the agent learns internally. Each step traded some form of prior knowledge or architectural simplicity for greater autonomy and generality.
+
+\section{Critical Evaluation and Broader Context}
+The AlphaGo family has profoundly impacted the field of Reinforcement Learning, demonstrating capabilities previously thought to be decades away. Their success has spurred immense interest and research in deep RL and planning.
+
+\textbf{Strengths of the Research Line:}
+\begin{itemize}
+    \item \textbf{Achieving Superhuman Performance:} Consistently reached or surpassed human expert levels in highly complex strategic games.
+    \item \textbf{Pushing Algorithmic Boundaries:} Introduced novel combinations of search, deep learning, and RL principles, leading to powerful, generalizable frameworks.
+    \item \textbf{Demonstrating End-to-End Learning:} Showcased the potential of learning complex behaviors and even environment models directly from raw inputs and reward signals.
+\end{itemize}
+
+\textbf{Enduring Limitations and Challenges:}
+\begin{itemize}
+    \item \textbf{Computational Expense:} Training these systems requires massive computational resources (e.g., thousands of TPUs/GPUs, extensive self-play), as highlighted for AlphaZero. This makes them inaccessible for many researchers and impractical for many real-world applications without significant hardware investment.
+    \item \textbf{Sample Efficiency:} While impressive, the sample efficiency (amount of experience needed to learn) can still be a concern, particularly for MuZero when learning complex models from scratch. Model-free methods can sometimes be more sample-efficient in domains where a good model is very hard to learn.
+    \item \textbf{Applicability Beyond Constrained Domains:}
+        \begin{itemize}
+            \item \textbf{Perfect Information \& Observability:} These algorithms were primarily developed for perfect information games where the full state is known. Extending them robustly to partially observable environments or games with hidden information (beyond what MuZero's history-based representation handles) is an ongoing research area.
+            \item \textbf{Beyond Zero-Sum Games:} While the MCTS framework can be adapted, their demonstration in multi-agent settings has largely been in two-player zero-sum contexts. Generalizing to complex multi-agent cooperation or non-zero-sum competition presents further challenges.
+            \item \textbf{Real-World Interaction:} Applying these methods to real-world robotics or other physical systems involves tackling issues like continuous state/action spaces, noisy sensors/actuators, and safety constraints, which are not primary concerns in simulated game environments.
+        \end{itemize}
+    \item \textbf{Interpretability:} The learned representations within the neural networks, especially MuZero's hidden states, are often "black boxes," making it difficult to understand precisely what the agent has learned or why it makes certain decisions.
+    \item \textbf{Exploration in Vast State Spaces:} While MCTS inherently performs exploration, ensuring effective and efficient exploration in exceptionally large or sparse-reward environments remains a fundamental RL challenge that these systems grapple with, often relying on the sheer scale of search.
+\end{itemize}
+
+These systems, while groundbreaking, operate within relatively well-defined, albeit complex, environments. The transition to messier, less structured real-world problems remains a significant hurdle for RL, one that future iterations or new paradigms will need to address.
 
 \section{Conclusion}
-The AlphaGo family represents a monumental achievement in AI and Reinforcement Learning. The journey from AlphaGo's expert-data-primed system to AlphaZero's tabula rasa mastery of several board games, and culminating in MuZero's ability to learn game dynamics from scratch, showcases a relentless pursuit of generality and autonomy. These systems have not only solved long-standing AI challenges but have also provided powerful new frameworks that blend deep learning with sophisticated search techniques.
+The AlphaGo, AlphaZero, and MuZero algorithms represent a remarkable progression in the field of Artificial Intelligence and Reinforcement Learning. From AlphaGo's initial reliance on human data to defeat a Go champion, to AlphaZero's mastery of multiple games through pure self-play, and culminating in MuZero's ability to learn environment models from scratch, this lineage has systematically reduced reliance on prior human knowledge and domain-specific engineering.
 
-Key mathematical contributions include the effective use of MCTS guided by learned policy and value functions, the end-to-end training of these components through self-play, and in MuZero, the pioneering approach of learning a model of the environment tailored for planning.
-
-While significant challenges related to computational cost, sample efficiency, and applicability to more complex real-world scenarios remain, the AlphaGo lineage has undeniably pushed the boundaries of what is possible in AI. It has laid a strong foundation for future research into developing more general, efficient, and capable intelligent agents. The principles demonstrated—self-play, learned models for planning, and the synergy of search and learning—will likely be central to continued progress in the field.
+These systems have powerfully demonstrated the efficacy of combining deep neural networks for rich function approximation with Monte Carlo Tree Search for robust planning, all driven by Reinforcement Learning from self-generated experience. While their computational demands and current applicability largely to perfect-information, discrete-action domains highlight ongoing challenges, their success has irrevocably advanced the state of the art. The AlphaGo family not only solved grand challenges but also provided a conceptual framework and a set of powerful tools that continue to inspire and inform the development of more general, autonomous, and capable AI systems. Future work will likely focus on enhancing sample efficiency, scaling to more complex and partially observable environments, and bridging the gap between superhuman game play and effective real-world agency.
 
 \clearpage
 
